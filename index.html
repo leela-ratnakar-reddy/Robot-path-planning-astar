@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Robot Path Planning Simulator — A* Search Algorithm</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body {
+      background-color: #121418;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    .panel-card {
+      background-color: #1a1f28;
+      border: 1px solid #2a3240;
+    }
+    .sub-panel {
+      background-color: #222834;
+    }
+    canvas {
+      display: block;
+      cursor: crosshair;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+  <!-- TOP HEADER -->
+  <header class="h-16 px-6 bg-[#181b22] border-b border-[#2a3240] flex items-center justify-between">
+    <div>
+      <h1 class="text-lg font-bold text-slate-100 tracking-wide">Robot Path Planning Simulator</h1>
+      <p id="headerSubtitle" class="text-xs text-slate-400">Implementation: A* Search Algorithm (Manhattan Distance)</p>
+    </div>
+    <div id="statusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-950/30 text-cyan-400 text-xs font-medium">
+      <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+      <span id="statusText">Ready</span>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="flex-1 p-4 flex gap-4 max-w-[1400px] w-full mx-auto">
+    <!-- LEFT: GRID CANVAS + CONTROLS -->
+    <div class="flex-1 flex flex-col gap-3">
+      <!-- CANVAS CONTAINER -->
+      <div class="panel-card rounded-xl p-3 flex justify-center items-center shadow-lg relative">
+        <canvas id="gridCanvas" width="840" height="575" class="rounded-lg shadow-inner"></canvas>
+      </div>
+
+      <!-- CONTROLS PANEL -->
+      <div class="panel-card rounded-xl p-3 flex flex-col gap-2 shadow-md">
+        <!-- ACTION ROW 1 -->
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btnRun" class="px-4 py-2 bg-cyan-700 hover:bg-cyan-600 active:bg-cyan-800 text-white rounded-lg text-xs font-semibold shadow transition">Run A*</button>
+          <button id="btnStep" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-medium transition">Step</button>
+          <button id="btnReset" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-medium transition">Reset</button>
+          <button id="btnClear" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-medium transition">Clear</button>
+          <button id="btnRandom" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-medium transition">Random</button>
+          <button id="btnCompare" class="px-4 py-2 bg-indigo-900/60 hover:bg-indigo-800 border border-indigo-500/40 text-indigo-300 rounded-lg text-xs font-semibold transition">Compare</button>
+          <button id="btnToggleAlgo" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-medium transition">Algo: A*</button>
+          <button id="btnSpeed" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-medium transition">Speed: 5x</button>
+        </div>
+
+        <!-- ACTION ROW 2: TOOLS -->
+        <div class="flex items-center gap-2 pt-1 border-t border-slate-800/80">
+          <span class="text-[11px] text-slate-400 font-medium">Tools:</span>
+          <button id="toolWall" class="px-3 py-1 bg-cyan-900 border border-cyan-500 text-cyan-200 rounded-md text-xs font-medium transition">Tool: Wall</button>
+          <button id="toolStart" class="px-3 py-1 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-md text-xs font-medium transition">Tool: Start</button>
+          <button id="toolGoal" class="px-3 py-1 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-md text-xs font-medium transition">Tool: Goal</button>
+          <span class="text-[11px] text-slate-500 ml-auto hidden sm:inline">Left-click: paint | Right-click: erase</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: SIDEBAR -->
+    <aside class="w-80 flex flex-col gap-3">
+      <!-- CARD 1: ENVIRONMENT CONFIG -->
+      <div class="panel-card rounded-xl p-3 shadow-md flex flex-col gap-1.5">
+        <div class="sub-panel px-2.5 py-1 rounded text-cyan-400 font-bold text-[11px] tracking-wider uppercase">Environment Config</div>
+        <div class="flex justify-between text-xs py-0.5"><span class="text-slate-400">Grid Size:</span><span class="font-medium text-slate-200">25 × 35 (875 cells)</span></div>
+        <div class="flex justify-between text-xs py-0.5"><span class="text-slate-400">Start Node (S):</span><span id="valStart" class="font-medium text-emerald-400">Row 12, Col 4</span></div>
+        <div class="flex justify-between text-xs py-0.5"><span class="text-slate-400">Goal Node (G):</span><span id="valGoal" class="font-medium text-rose-400">Row 12, Col 30</span></div>
+        <div class="flex justify-between text-xs py-0.5"><span class="text-slate-400">Obstacles:</span><span id="valObs" class="font-medium text-slate-200">0 cells (0.0%)</span></div>
+      </div>
+
+      <!-- CARD 2: ALGORITHM PERFORMANCE -->
+      <div class="panel-card rounded-xl p-3 shadow-md flex flex-col gap-1.5">
+        <div class="sub-panel px-2.5 py-1 rounded text-cyan-400 font-bold text-[11px] tracking-wider uppercase">Algorithm Performance</div>
+        <div class="flex justify-between text-xs py-0.5"><span class="text-slate-400">Active Algorithm:</span><span id="valAlgo" class="font-semibold text-cyan-400">A* (Manhattan)</span></div>
+        <div class="flex justify-between text-xs py-0.5"><span class="text-slate-400">Computation Time:</span><span id="valTime" class="font-semibold text-cyan-300">0.000 ms</span></div>
+        <div class="flex justify-between text-xs py-0.5"><span class="text-slate-400">Path Length:</span><span id="valPathLen" class="font-medium text-slate-200">N/A</span></div>
+        <div class="flex justify-between text-xs py-0.5"><span class="text-slate-400">Total Path Cost:</span><span id="valPathCost" class="font-medium text-slate-200">N/A</span></div>
+        <div class="flex justify-between text-xs py-0.5"><span class="text-slate-400">Explored Nodes:</span><span id="valExplored" class="font-medium text-slate-200">0 (0.0%)</span></div>
+        <div class="flex justify-between text-xs py-0.5"><span class="text-slate-400">Discovered Nodes:</span><span id="valDiscovered" class="font-medium text-slate-200">0</span></div>
+        <div class="flex justify-between text-xs py-0.5"><span class="text-slate-400">Result Status:</span><span id="valStatus" class="font-bold text-amber-400">READY</span></div>
+      </div>
+
+      <!-- CARD 3: COMPARISON MODAL / KEY -->
+      <div id="compCard" class="panel-card rounded-xl p-3 shadow-md flex flex-col gap-1.5">
+        <div class="sub-panel px-2.5 py-1 rounded text-cyan-400 font-bold text-[11px] tracking-wider uppercase">A* vs Dijkstra Comparison</div>
+        <div class="grid grid-cols-3 text-[11px] text-slate-400 border-b border-slate-700/60 pb-1 font-semibold">
+          <span>Metric</span><span class="text-cyan-400">A* (Manh)</span><span class="text-slate-300">Dijkstra</span>
+        </div>
+        <div class="grid grid-cols-3 text-xs py-0.5">
+          <span class="text-slate-400">Status</span><span id="cmpStatA" class="font-medium text-emerald-400">Ready</span><span id="cmpStatD" class="font-medium text-slate-300">Ready</span>
+        </div>
+        <div class="grid grid-cols-3 text-xs py-0.5">
+          <span class="text-slate-400">Path Cost</span><span id="cmpCostA" class="font-medium text-slate-200">-</span><span id="cmpCostD" class="font-medium text-slate-200">-</span>
+        </div>
+        <div class="grid grid-cols-3 text-xs py-0.5">
+          <span class="text-slate-400">Explored</span><span id="cmpExpA" class="font-bold text-emerald-400">-</span><span id="cmpExpD" class="font-medium text-slate-200">-</span>
+        </div>
+        <div class="grid grid-cols-3 text-xs py-0.5">
+          <span class="text-slate-400">Time (ms)</span><span id="cmpTimeA" class="font-medium text-cyan-300">-</span><span id="cmpTimeD" class="font-medium text-slate-300">-</span>
+        </div>
+        <div id="cmpNote" class="text-[11px] text-emerald-400 font-medium pt-1 hidden"></div>
+      </div>
+
+      <!-- CARD 4: COLOR LEGEND -->
+      <div class="panel-card rounded-xl p-3 shadow-md flex flex-col gap-1.5">
+        <div class="sub-panel px-2.5 py-1 rounded text-cyan-400 font-bold text-[11px] tracking-wider uppercase">Color Legend & Key</div>
+        <div class="grid grid-cols-2 gap-1.5 text-xs">
+          <div class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-emerald-500 flex items-center justify-center text-[9px] font-bold text-white">S</span><span class="text-slate-300">Start Node</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-rose-500 flex items-center justify-center text-[9px] font-bold text-white">G</span><span class="text-slate-300">Goal Node</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-[#414b5c] border border-[#505c70]"></span><span class="text-slate-300">Obstacle Wall</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-[#2d5591]"></span><span class="text-slate-300">Explored (Closed)</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-[#d9821c]"></span><span class="text-slate-300">Frontier (Open)</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-[#06b6d4]"></span><span class="text-slate-300">Optimal Path</span></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="h-9 px-6 bg-[#181b22] border-t border-[#2a3240] flex items-center justify-between text-xs text-slate-400">
+    <span id="footerHint">Left-click to place obstacles | Right-click to erase | SPACE to run A* search</span>
+    <span class="text-slate-500">DAA College Project | Python & Web Simulation</span>
+  </footer>
+
+  <!-- SCRIPT -->
+  <script>
+    // --- GRID CONFIGURATION ---
+    const ROWS = 25;
+    const COLS = 35;
+    const CELL_SIZE = 23;
+
+    let start = [12, 4];
+    let goal = [12, 30];
+    let obstacles = new Set();
+    let explored = new Set();
+    let frontier = new Set();
+    let path = [];
+    let robotPos = [...start];
+
+    // Tool Modes: "WALL", "START", "GOAL"
+    let currentTool = "WALL";
+    let currentAlgo = "ASTAR"; // "ASTAR" or "DIJKSTRA"
+    let speed = 5; // 1, 5, 20, 999999
+    let isRunning = false;
+    let isPaused = false;
+    let trace = [];
+    let traceIndex = 0;
+    let robotIndex = 0;
+    let animReq = null;
+
+    // Canvas
+    const canvas = document.getElementById("gridCanvas");
+    const ctx = canvas.getContext("2d");
+    let isMouseDown = false;
+    let eraseMode = false;
+
+    // Helper Key
+    const key = (r, c) => `${r},${c}`;
+
+    // --- ALGORITHM LOGIC ---
+    function manhattan(r1, c1, r2, c2) {
+      return Math.abs(r1 - r2) + Math.abs(c1 - c2);
+    }
+
+    function runAlgorithm(algoMode, recordTrace = false) {
+      const t0 = performance.now();
+      const openHeap = []; // min-heap simulation
+      let counter = 0;
+
+      const gScore = new Map();
+      const parents = new Map();
+      const closedSet = new Set();
+      const discoveredSet = new Set();
+      const localTrace = [];
+
+      const startKey = key(start[0], start[1]);
+      const goalKey = key(goal[0], goal[1]);
+
+      gScore.set(startKey, 0);
+      const startH = algoMode === "ASTAR" ? manhattan(start[0], start[1], goal[0], goal[1]) : 0;
+      openHeap.push({ f: startH, h: startH, c: counter++, coord: [...start] });
+      discoveredSet.add(startKey);
+
+      if (recordTrace) {
+        localTrace.push({ type: "DISCOVER", coord: [...start] });
+      }
+
+      let goalReached = false;
+      const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+      while (openHeap.length > 0) {
+        // extract min f, then min h
+        openHeap.sort((a, b) => a.f - b.f || a.h - b.h || a.c - b.c);
+        const current = openHeap.shift();
+        const ck = key(current.coord[0], current.coord[1]);
+
+        if (closedSet.has(ck)) continue;
+        closedSet.add(ck);
+
+        if (recordTrace) {
+          localTrace.push({ type: "VISIT", coord: current.coord });
+        }
+
+        if (current.coord[0] === goal[0] && current.coord[1] === goal[1]) {
+          goalReached = true;
+          break;
+        }
+
+        for (const [dr, dc] of DIRS) {
+          const nr = current.coord[0] + dr;
+          const nc = current.coord[1] + dc;
+          const nk = key(nr, nc);
+
+          if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+          if (obstacles.has(nk) || closedSet.has(nk)) continue;
+
+          const tentG = gScore.get(ck) + 1;
+          if (tentG < (gScore.get(nk) ?? Infinity)) {
+            gScore.set(nk, tentG);
+            parents.set(nk, current.coord);
+            const hVal = algoMode === "ASTAR" ? manhattan(nr, nc, goal[0], goal[1]) : 0;
+            const fVal = tentG + hVal;
+            openHeap.push({ f: fVal, h: hVal, c: counter++, coord: [nr, nc] });
+            discoveredSet.add(nk);
+
+            if (recordTrace) {
+              localTrace.push({ type: "DISCOVER", coord: [nr, nc] });
+            }
+          }
+        }
+      }
+
+      const elapsed = performance.now() - t0;
+
+      let computedPath = [];
+      if (goalReached) {
+        let curr = goal;
+        while (curr) {
+          computedPath.push(curr);
+          const pk = key(curr[0], curr[1]);
+          curr = parents.get(pk);
+        }
+        computedPath.reverse();
+      }
+
+      return {
+        found: goalReached,
+        path: computedPath,
+        cost: computedPath.length > 0 ? computedPath.length - 1 : 0,
+        exploredCount: closedSet.size,
+        discoveredCount: discoveredSet.size,
+        timeMs: elapsed,
+        trace: localTrace,
+        closedNodes: closedSet
+      };
+    }
+
+    // --- RENDER FUNCTION ---
+    function draw() {
+      ctx.fillStyle = "#161a22";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const pathSet = new Set(path.map(p => key(p[0], p[1])));
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const k = key(r, c);
+          const x = c * CELL_SIZE;
+          const y = r * CELL_SIZE;
+
+          if (obstacles.has(k)) {
+            ctx.fillStyle = "#414b5c";
+            ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+            ctx.strokeStyle = "#505c70";
+            ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+          } else if (pathSet.has(k) && !(r === start[0] && c === start[1]) && !(r === goal[0] && c === goal[1])) {
+            ctx.fillStyle = "#06b6d4";
+            ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+            ctx.strokeStyle = "#0e7490";
+            ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+          } else if (explored.has(k) && !(r === start[0] && c === start[1]) && !(r === goal[0] && c === goal[1])) {
+            ctx.fillStyle = "#2d5591";
+            ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+            ctx.strokeStyle = "#3c6ab2";
+            ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+          } else if (frontier.has(k) && !(r === start[0] && c === start[1]) && !(r === goal[0] && c === goal[1])) {
+            ctx.fillStyle = "#d9821c";
+            ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+            ctx.strokeStyle = "#f5a623";
+            ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+          } else {
+            ctx.strokeStyle = "#202632";
+            ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+          }
+        }
+      }
+
+      // Draw path line
+      if (path.length > 1) {
+        ctx.strokeStyle = "#a5f3fc";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        for (let i = 0; i < path.length; i++) {
+          const px = path[i][1] * CELL_SIZE + CELL_SIZE / 2;
+          const py = path[i][0] * CELL_SIZE + CELL_SIZE / 2;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.lineWidth = 1;
+      }
+
+      // Start Marker
+      ctx.fillStyle = "#10b981";
+      ctx.fillRect(start[1] * CELL_SIZE, start[0] * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 13px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("S", start[1] * CELL_SIZE + CELL_SIZE / 2, start[0] * CELL_SIZE + CELL_SIZE / 2);
+
+      // Goal Marker
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(goal[1] * CELL_SIZE, goal[0] * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText("G", goal[1] * CELL_SIZE + CELL_SIZE / 2, goal[0] * CELL_SIZE + CELL_SIZE / 2);
+
+      // Robot
+      const rx = robotPos[1] * CELL_SIZE + CELL_SIZE / 2;
+      const ry = robotPos[0] * CELL_SIZE + CELL_SIZE / 2;
+      ctx.fillStyle = "#334155";
+      ctx.fillRect(rx - 8, ry - 7, 16, 14);
+      ctx.fillStyle = "#f1f5f9";
+      ctx.beginPath();
+      ctx.arc(rx, ry, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#06b6d4";
+      ctx.beginPath();
+      ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // --- ANIMATION CONTROLLER ---
+    function startSearch() {
+      if (isRunning && !isPaused) return;
+
+      clearMetadata();
+      const res = runAlgorithm(currentAlgo, true);
+      trace = res.trace;
+      traceIndex = 0;
+      robotIndex = 0;
+      isRunning = true;
+      isPaused = false;
+
+      document.getElementById("btnRun").textContent = "Pause";
+      document.getElementById("valTime").textContent = `${res.timeMs.toFixed(3)} ms`;
+
+      if (speed >= 999999) {
+        explored = res.closedNodes;
+        frontier.clear();
+        path = res.path;
+        robotPos = res.path.length > 0 ? [...res.path[res.path.length - 1]] : [...start];
+        finishSearch(res);
+        draw();
+        return;
+      }
+
+      runAnimationLoop(res);
+    }
+
+    function runAnimationLoop(res) {
+      function loop() {
+        if (!isRunning || isPaused) return;
+
+        // Advance trace
+        for (let i = 0; i < speed; i++) {
+          if (traceIndex < trace.length) {
+            const ev = trace[traceIndex++];
+            const k = key(ev.coord[0], ev.coord[1]);
+            if (ev.type === "DISCOVER") frontier.add(k);
+            else if (ev.type === "VISIT") {
+              frontier.delete(k);
+              explored.add(k);
+            }
+          } else {
+            break;
+          }
+        }
+
+        draw();
+
+        if (traceIndex >= trace.length) {
+          if (res.found) {
+            path = res.path;
+            animateRobot(res);
+          } else {
+            finishSearch(res);
+          }
+          return;
+        }
+
+        animReq = requestAnimationFrame(loop);
+      }
+      animReq = requestAnimationFrame(loop);
+    }
+
+    function animateRobot(res) {
+      function rLoop() {
+        if (!isRunning || isPaused) return;
+        if (robotIndex < res.path.length) {
+          robotPos = res.path[robotIndex++];
+          draw();
+          setTimeout(rLoop, 35);
+        } else {
+          finishSearch(res);
+        }
+      }
+      rLoop();
+    }
+
+    function finishSearch(res) {
+      isRunning = false;
+      isPaused = false;
+      document.getElementById("btnRun").textContent = "Run A*";
+
+      if (res.found) {
+        document.getElementById("statusText").textContent = "Path Found!";
+        document.getElementById("valPathLen").textContent = `${res.path.length - 1} moves`;
+        document.getElementById("valPathCost").textContent = `${res.cost}`;
+        document.getElementById("valStatus").textContent = "SUCCESS";
+        document.getElementById("valStatus").className = "font-bold text-emerald-400";
+      } else {
+        document.getElementById("statusText").textContent = "No Path Found!";
+        document.getElementById("valStatus").textContent = "NO PATH";
+        document.getElementById("valStatus").className = "font-bold text-rose-400";
+      }
+
+      const totalCells = ROWS * COLS;
+      document.getElementById("valExplored").textContent = `${res.exploredCount} (${((res.exploredCount / totalCells) * 100).toFixed(1)}%)`;
+      document.getElementById("valDiscovered").textContent = `${res.discoveredCount}`;
+    }
+
+    function clearMetadata() {
+      explored.clear();
+      frontier.clear();
+      path = [];
+      robotPos = [...start];
+      trace = [];
+      traceIndex = 0;
+      robotIndex = 0;
+      if (animReq) cancelAnimationFrame(animReq);
+      isRunning = false;
+      isPaused = false;
+    }
+
+    function updateObsCount() {
+      const density = ((obstacles.size / (ROWS * COLS)) * 100).toFixed(1);
+      document.getElementById("valObs").textContent = `${obstacles.size} cells (${density}%)`;
+    }
+
+    // --- EVENT LISTENERS ---
+    canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+    function getGridCoord(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      const c = Math.floor(x / CELL_SIZE);
+      const r = Math.floor(y / CELL_SIZE);
+      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) return [r, c];
+      return null;
+    }
+
+    canvas.addEventListener("mousedown", e => {
+      if (isRunning) return;
+      isMouseDown = true;
+      eraseMode = (e.button === 2);
+      const coord = getGridCoord(e);
+      if (!coord) return;
+      applyTool(coord[0], coord[1], eraseMode);
+    });
+
+    window.addEventListener("mouseup", () => isMouseDown = false);
+
+    canvas.addEventListener("mousemove", e => {
+      if (!isMouseDown || isRunning) return;
+      const coord = getGridCoord(e);
+      if (!coord) return;
+      applyTool(coord[0], coord[1], eraseMode);
+    });
+
+    function applyTool(r, c, isErase) {
+      const k = key(r, c);
+      if (currentTool === "WALL") {
+        if (isErase) {
+          obstacles.delete(k);
+        } else {
+          if ((r !== start[0] || c !== start[1]) && (r !== goal[0] || c !== goal[1])) {
+            obstacles.add(k);
+          }
+        }
+      } else if (currentTool === "START") {
+        if (!obstacles.has(k) && (r !== goal[0] || c !== goal[1])) {
+          start = [r, c];
+          document.getElementById("valStart").textContent = `Row ${r}, Col ${c}`;
+        }
+      } else if (currentTool === "GOAL") {
+        if (!obstacles.has(k) && (r !== start[0] || c !== start[1])) {
+          goal = [r, c];
+          document.getElementById("valGoal").textContent = `Row ${r}, Col ${c}`;
+        }
+      }
+      clearMetadata();
+      updateObsCount();
+      draw();
+    }
+
+    // BUTTON HANDLERS
+    document.getElementById("btnRun").addEventListener("click", () => {
+      if (isRunning) {
+        isPaused = !isPaused;
+        document.getElementById("btnRun").textContent = isPaused ? "Resume" : "Pause";
+        if (!isPaused) runAnimationLoop();
+      } else {
+        startSearch();
+      }
+    });
+
+    document.getElementById("btnStep").addEventListener("click", () => {
+      if (!isRunning) startSearch();
+      isPaused = true;
+      document.getElementById("btnRun").textContent = "Resume";
+      if (traceIndex < trace.length) {
+        const ev = trace[traceIndex++];
+        const k = key(ev.coord[0], ev.coord[1]);
+        if (ev.type === "DISCOVER") frontier.add(k);
+        else if (ev.type === "VISIT") {
+          frontier.delete(k);
+          explored.add(k);
+        }
+        draw();
+      }
+    });
+
+    document.getElementById("btnReset").addEventListener("click", () => {
+      clearMetadata();
+      document.getElementById("statusText").textContent = "Ready";
+      document.getElementById("valStatus").textContent = "READY";
+      document.getElementById("valStatus").className = "font-bold text-amber-400";
+      draw();
+    });
+
+    document.getElementById("btnClear").addEventListener("click", () => {
+      obstacles.clear();
+      clearMetadata();
+      updateObsCount();
+      draw();
+    });
+
+    document.getElementById("btnRandom").addEventListener("click", () => {
+      obstacles.clear();
+      clearMetadata();
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if ((r === start[0] && c === start[1]) || (r === goal[0] && c === goal[1])) continue;
+          if (Math.random() < 0.25) obstacles.add(key(r, c));
+        }
+      }
+      updateObsCount();
+      draw();
+    });
+
+    document.getElementById("btnCompare").addEventListener("click", () => {
+      clearMetadata();
+      const resA = runAlgorithm("ASTAR", false);
+      const resD = runAlgorithm("DIJKSTRA", false);
+
+      document.getElementById("cmpStatA").textContent = resA.found ? "Success" : "Failed";
+      document.getElementById("cmpStatD").textContent = resD.found ? "Success" : "Failed";
+      document.getElementById("cmpCostA").textContent = `${resA.cost}`;
+      document.getElementById("cmpCostD").textContent = `${resD.cost}`;
+      document.getElementById("cmpExpA").textContent = `${resA.exploredCount}`;
+      document.getElementById("cmpExpD").textContent = `${resD.exploredCount}`;
+      document.getElementById("cmpTimeA").textContent = `${resA.timeMs.toFixed(2)}`;
+      document.getElementById("cmpTimeD").textContent = `${resD.timeMs.toFixed(2)}`;
+
+      const note = document.getElementById("cmpNote");
+      if (resD.exploredCount > 0) {
+        const saved = (((resD.exploredCount - resA.exploredCount) / resD.exploredCount) * 100).toFixed(1);
+        note.textContent = `A* explored ${saved}% fewer nodes to find the same optimal path!`;
+        note.classList.remove("hidden");
+      }
+
+      explored = resA.closedNodes;
+      path = resA.path;
+      finishSearch(resA);
+      draw();
+    });
+
+    document.getElementById("btnToggleAlgo").addEventListener("click", () => {
+      currentAlgo = currentAlgo === "ASTAR" ? "DIJKSTRA" : "ASTAR";
+      document.getElementById("btnToggleAlgo").textContent = `Algo: ${currentAlgo === "ASTAR" ? "A*" : "Dijkstra"}`;
+      document.getElementById("valAlgo").textContent = currentAlgo === "ASTAR" ? "A* (Manhattan)" : "Dijkstra (h=0)";
+      document.getElementById("headerSubtitle").textContent = `Implementation: ${currentAlgo === "ASTAR" ? "A* Search Algorithm (Manhattan Distance)" : "Dijkstra's Algorithm (Zero Heuristic)"}`;
+      clearMetadata();
+      draw();
+    });
+
+    document.getElementById("btnSpeed").addEventListener("click", () => {
+      if (speed === 1) { speed = 5; document.getElementById("btnSpeed").textContent = "Speed: 5x"; }
+      else if (speed === 5) { speed = 20; document.getElementById("btnSpeed").textContent = "Speed: 20x"; }
+      else if (speed === 20) { speed = 999999; document.getElementById("btnSpeed").textContent = "Speed: Max"; }
+      else { speed = 1; document.getElementById("btnSpeed").textContent = "Speed: 1x"; }
+    });
+
+    // TOOL SWITCHERS
+    const toolWall = document.getElementById("toolWall");
+    const toolStart = document.getElementById("toolStart");
+    const toolGoal = document.getElementById("toolGoal");
+
+    function setTool(tool) {
+      currentTool = tool;
+      toolWall.className = tool === "WALL" ? "px-3 py-1 bg-cyan-900 border border-cyan-500 text-cyan-200 rounded-md text-xs font-medium transition" : "px-3 py-1 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-md text-xs font-medium transition";
+      toolStart.className = tool === "START" ? "px-3 py-1 bg-emerald-900 border border-emerald-500 text-emerald-200 rounded-md text-xs font-medium transition" : "px-3 py-1 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-md text-xs font-medium transition";
+      toolGoal.className = tool === "GOAL" ? "px-3 py-1 bg-rose-900 border border-rose-500 text-rose-200 rounded-md text-xs font-medium transition" : "px-3 py-1 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-md text-xs font-medium transition";
+    }
+
+    toolWall.addEventListener("click", () => setTool("WALL"));
+    toolStart.addEventListener("click", () => setTool("START"));
+    toolGoal.addEventListener("click", () => setTool("GOAL"));
+
+    // KEYBOARD SHORTCUTS
+    window.addEventListener("keydown", e => {
+      if (e.code === "Space") { e.preventDefault(); document.getElementById("btnRun").click(); }
+      else if (e.key === "s" || e.key === "S") document.getElementById("btnStep").click();
+      else if (e.key === "r" || e.key === "R") document.getElementById("btnReset").click();
+      else if (e.key === "c" || e.key === "C") document.getElementById("btnClear").click();
+      else if (e.key === "g" || e.key === "G") document.getElementById("btnRandom").click();
+      else if (e.key === "m" || e.key === "M") document.getElementById("btnCompare").click();
+      else if (e.key === "1") { currentAlgo = "DIJKSTRA"; document.getElementById("btnToggleAlgo").click(); }
+      else if (e.key === "2") { currentAlgo = "ASTAR"; document.getElementById("btnToggleAlgo").click(); }
+    });
+
+    // INITIAL DRAW
+    draw();
+    updateObsCount();
+  </script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Testing and Type Checking Caches
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+[Tt]humbs.db
+ehthumbs.db
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# Temporary files and logs
+*.log
+*.tmp
